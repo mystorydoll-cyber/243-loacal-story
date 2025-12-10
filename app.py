@@ -24,9 +24,11 @@ region_data = {
     }
 }
 
-# 사이드바에 API 키 입력 (보안을 위해)
-api_key = st.sidebar.text_input("sk-proj—3XaLlqjVIwKOhrX8tCeLFZh-U8HJeTHrO7o9VUe2AlvnS-MjGwdtO4-wxckPBzE4EwXcsZSmcT3BlbkFJAUpMjG9P4w2cGsMeYXzfN8r27UZE5QzTzqMkn-lTPE8kS1HbTtB042HAQP0xXMHFlox8Lg4tcA", type="password")
-
+# Secrets에서 키를 가져오거나, 없으면 입력받기
+if "OPENAI_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENAI_API_KEY"]
+else:
+    api_key = st.sidebar.text_input("API Key를 입력하세요", type="password")
 # 3. 사용자 인터페이스 (UI) 구성
 # 지역 선택
 selected_region = st.selectbox("어떤 지역의 이야기를 원하시나요?", list(region_data.keys()))
