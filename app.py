@@ -1,82 +1,103 @@
 import streamlit as st
 import openai
+import pandas as pd
 
 # 1. 페이지 기본 설정
-st.set_page_config(page_title="나만의 지역 이야기 만들기", page_icon="🗺️")
+st.set_page_config(page_title="243개 지역: 나만의 이야기 생성기", page_icon="🗺️")
 
 st.title("🗺️ 243개 지역: 나만의 이야기 생성기")
-st.write("원하는 지역을 선택하고, 당신만의 상상력을 더해 새로운 이야기를 만들어보세요!")
+st.write("당신이 선택한 지역의 캐릭터와 함께 새로운 전설을 만들어보세요!")
 
-# 2. 가상의 데이터 (나중에는 243개 데이터베이스나 엑셀 파일로 대체합니다)
-# 예시로 3개만 넣어두었습니다.
-region_data = {
-    "서울 종로": {
-        "story": "과거와 현재가 공존하는 거리, 오래된 골목마다 시간 여행자가 숨어 있다.",
-        "character": "김시간 (회중시계를 든 골동품 가게 주인)"
-    },
-    "부산 해운대": {
-        "story": "푸른 바다 아래 용궁으로 가는 비밀 통로가 존재한다.",
-        "character": "박파도 (말하는 갈매기와 대화하는 서퍼)"
-    },
-    "전주 한옥마을": {
-        "story": "한복을 입으면 조선시대의 기억을 엿볼 수 있는 능력이 생긴다.",
-        "character": "이단아 (비밀을 간직한 한복 디자이너)"
-    }
-}
-
-# Secrets에서 키를 가져오거나, 없으면 입력받기
+# Secrets에서 키 가져오기 (없으면 사이드바 입력)
 if "OPENAI_API_KEY" in st.secrets:
     api_key = st.secrets["OPENAI_API_KEY"]
 else:
-    api_key = st.sidebar.text_input("API Key를 입력하세요", type="password")
+    api_key = st.sidebar.text_input("OpenAI API Key를 입력하세요", type="password")
+
+# 2. 데이터 불러오기
+@st.cache_data
+def load_data():
+    try:
+        # 엑셀(CSV) 파일 읽기
+        return pd.read_csv("data.csv")
+    except:
+        # 윈도우에서 저장한 파일인 경우 인코딩 처리
+        return pd.read_csv("data.csv", encoding='cp949')
+
+try:
+    df = load_data()
+    # 데이터가 잘 읽혔다면 사이드바에 표시 (확인용)
+    st.sidebar.success(f"📂 {len(df)}개 지역 데이터 준비 완료!")
+except Exception as e:
+    st.error(f"데이터 파일(data.csv)을 읽을 수 없습니다. 깃허브에 파일이 있는지 확인해주세요!\n에러 내용: {e}")
+    st.stop()
+
 # 3. 사용자 인터페이스 (UI) 구성
-# 지역 선택
-selected_region = st.selectbox("어떤 지역의 이야기를 원하시나요?", list(region_data.keys()))
+# '지역' 컬럼을 기준으로 선택 상자 만들기
+selected_region = st.selectbox("어떤 지역의 이야기를 원하시나요?", df['지역'].unique())
 
 if selected_region:
-    # 선택된 지역 정보 보여주기
-    info = region_data[selected_region]
-    st.info(f"**기본 설정**\n\n* **스토리:** {info['story']}\n* **캐릭터:** {info['character']}")
+    # 선택된 지역의 모든 정보 가져오기
+    info = df[df['지역'] == selected_region].iloc[0]
 
-    # 사용자 입력 받기
-    user_idea = st.text_area("당신의 아이디어를 더해주세요! (예: 주인공이 갑자기 초능력을 얻게 된다면?)")
+    # 화면에 정보 예쁘게 보여주기
+    st.markdown(f"### {info['제목']}") # 제목을 크게 표시
+    st.info(f"""
+    * **👤 이름:** {info['이름']}
+    * **🗣️ 입버릇:** "{info['입버릇']}"
+    * **💖 좋아하는 것:** {info['좋아하는 것']}
+    * **✨ 성격:** {info['성격']}
+    * **🎒 아이템:** {info['외형 아이템']}
+    * **📜 스토리:** {info['지역테마 스토리']}
+    """)
+    
+    # 이미지 설명은 화면엔 안 보여줘도 되지만, 필요하면 아래 주석(#)을 풀어서 보세요
+    # st.caption(f"이미지 컨셉: {info['이미지용 한줄 설명']}")
+
+    # 사용자 아이디어 입력
+    user_idea = st.text_area("당신의 상상력을 더해주세요! (예: 주인공이 갑자기 아이템을 잃어버린다면?)")
 
     # 이야기 생성 버튼
     if st.button("새로운 이야기 만들기 ✨"):
         if not api_key:
-            st.warning("먼저 왼쪽 사이드바에 OpenAI API Key를 입력해주세요.")
-            # API 키가 없을 때 테스트용 가짜 응답
-            st.markdown("---")
-            st.subheader("🤖 AI가 만든 이야기 (테스트 모드)")
-            st.write(f"테스트 모드입니다.\n\n'{selected_region}'의 '{info['character']}'가 '{user_idea}'라는 상황을 겪는 멋진 이야기가 생성될 예정입니다!")
+            st.warning("API Key가 설정되지 않았습니다.")
         else:
-            # 실제 AI 호출 로직
             try:
                 client = openai.OpenAI(api_key=api_key)
                 
+                # AI에게 보낼 상세한 명령서 (프롬프트)
                 prompt = f"""
-                당신은 창의적인 소설가입니다. 아래 설정을 바탕으로 새로운 짧은 소설을 써주세요.
+                당신은 창의적인 판타지 소설가입니다. 아래 캐릭터 설정을 완벽하게 반영하여 새로운 단편 소설을 써주세요.
                 
-                [기본 설정]
-                - 지역: {selected_region}
-                - 배경 스토리: {info['story']}
-                - 주인공: {info['character']}
+                [캐릭터 및 배경 설정]
+                - 지역: {info['지역']}
+                - 소설 제목: {info['제목']}
+                - 주인공 이름: {info['이름']}
+                - 성격: {info['성격']} (이 성격이 드러나는 행동을 묘사할 것)
+                - 입버릇: "{info['입버릇']}" (대화 중에 이 입버릇을 반드시 1회 이상 사용할 것)
+                - 좋아하는 것: {info['좋아하는 것']}
+                - 소지 아이템: {info['외형 아이템']}
+                - 원작 배경 스토리: {info['지역테마 스토리']}
                 
-                [사용자 아이디어]
-                {user_idea}
+                [사용자 추가 아이디어]
+                상황: {user_idea}
                 
-                위 내용을 결합하여 흥미진진한 이야기를 500자 내외로 작성해 주세요.
+                [요청사항]
+                1. 위 '원작 배경 스토리'와 '사용자 아이디어'를 자연스럽게 연결해주세요.
+                2. 주인공의 성격과 말투(입버릇)를 살려서 생동감 있게 묘사해주세요.
+                3. 글자 수는 600자 내외로 작성해주세요.
                 """
                 
-                with st.spinner("AI가 열심히 이야기를 쓰고 있습니다..."):
+                with st.spinner(f"AI가 '{info['이름']}'의 이야기를 쓰고 있습니다..."):
                     response = client.chat.completions.create(
-                        model="gpt-3.5-turbo", # 또는 gpt-4
+                        model="gpt-3.5-turbo", # 더 똑똑한 모델을 원하면 "gpt-4"로 변경 가능
                         messages=[{"role": "user", "content": prompt}]
                     )
                     story_result = response.choices[0].message.content
                 
+                # 결과 출력
                 st.markdown("---")
-                st.subheader(f"📖 {selected_region}의 새로운 전설")
+                st.subheader(f"📖 {info['이름']}의 새로운 모험")
                 st.write(story_result)
                 
             except Exception as e:
