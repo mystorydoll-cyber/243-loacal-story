@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-from openai import OpenAI  # OpenAI를 불러오는 주문
+from openai import OpenAI
+import os
 
 # 1. 페이지 설정
-st.set_page_config(page_title="나만의 이야기 생성기", layout="wide")
-st.title("🧙‍♂️ 나만의 이야기 생성기 (AI 작동중)")
+st.set_page_config(page_title="243개 지역: 나만의 이야기 생성기", layout="wide")
+st.title("🗺️ 243개 지역: 나만의 이야기 생성기")
 
 # 2. 사이드바: API 키 입력
 with st.sidebar:
@@ -16,26 +17,58 @@ with st.sidebar:
     
     st.success("✅ 연결되었습니다!")
 
-# 3. 샘플 데이터 (파일 없이 테스트)
-data = pd.DataFrame({
-    '지역': ['서울 종로', '부산 해운대', '제주도', '경주'],
-    '캐릭터': ['김시간 (골동품 가게 주인)', '박파도 (서퍼)', '한라봉 (요정)', '이천년 (신라의 유령)'],
-    '특징': ['과거와 현재가 공존함', '열정적이고 활기참', '신비롭고 자연친화적', '역사가 살아숨쉼']
-})
+# 3. 데이터 로드 (인코딩 문제 해결사)
+@st.cache_data
+def load_data():
+    file_path = 'data.csv'
+    # 1순위: utf-8 (맥/리눅스 표준)
+    try:
+        return pd.read_csv(file_path, encoding='utf-8')
+    except:
+        pass
+    # 2순위: cp949 (윈도우 엑셀 표준)
+    try:
+        return pd.read_csv(file_path, encoding='cp949')
+    except:
+        pass
+    # 3순위: euc-kr (구형 한글)
+    try:
+        return pd.read_csv(file_path, encoding='euc-kr')
+    except:
+        return pd.DataFrame() # 실패하면 빈 데이터 반환
+
+data = load_data()
+
+# 데이터가 잘 읽혔는지 확인
+if data.empty:
+    st.error("❌ 데이터 파일(data.csv)을 읽을 수 없습니다. 엑셀 파일의 내용이 비어있거나 형식이 잘못되었는지 확인해주세요.")
+    st.stop()
 
 # 4. 화면 구성
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("1. 지역 선택")
-    selected_region = st.selectbox("어떤 지역으로 떠날까요?", data['지역'])
+    # CSV 파일의 첫 번째 열(보통 지역명)을 선택 상자로 만듦
+    # 주의: 엑셀 파일의 첫 줄(헤더)이 '지역', '캐릭터', '특징' 등으로 되어있다고 가정합니다.
+    # 만약 에러가 난다면 엑셀 파일의 첫 줄 제목을 확인해야 합니다.
     
-    # 선택된 지역의 정보 가져오기
-    selected_row = data[data['지역'] == selected_region].iloc[0]
-    character = selected_row['캐릭터']
-    feature = selected_row['특징']
-    
-    st.info(f"🗺️ **{selected_region}**\n\n👤 캐릭터: {character}\n\n✨ 특징: {feature}")
+    try:
+        selected_region = st.selectbox("어떤 지역으로 떠날까요?", data['지역'])
+        
+        # 선택된 지역의 행(Row) 찾기
+        selected_row = data[data['지역'] == selected_region].iloc[0]
+        
+        # 엑셀 컬럼 이름에 맞춰서 변수 저장 (컬럼명이 다르면 여기서 에러가 날 수 있음)
+        character = selected_row['캐릭터']
+        feature = selected_row['특징']
+        
+        st.info(f"📍 **{selected_region}**\n\n👤 캐릭터: {character}\n\n✨ 특징: {feature}")
+        
+    except KeyError:
+        st.error("⚠️ 엑셀 파일의 맨 윗줄(제목)이 '지역', '캐릭터', '특징'으로 되어 있는지 확인해주세요!")
+        st.dataframe(data.head()) # 데이터 미리보기 제공
+        st.stop()
 
 with col2:
     st.subheader("2. 이야기 아이디어")
@@ -48,10 +81,8 @@ if generate_btn:
     if not user_input:
         st.warning("아이디어를 입력해주세요!")
     else:
-        # 여기에 진짜 AI를 부르는 코드가 들어갑니다
-        with st.spinner("AI가 열심히 이야기를 짓고 있습니다...✍️"):
+        with st.spinner(f"AI가 '{selected_region}'의 이야기를 짓고 있습니다...✍️"):
             try:
-                # 1) AI에게 줄 명령서 만들기
                 client = OpenAI(api_key=api_key)
                 
                 prompt = f"""
@@ -65,13 +96,11 @@ if generate_btn:
                 제목도 멋지게 지어주세요.
                 """
                 
-                # 2) AI에게 명령 보내기 (GPT-4o-mini 모델 사용)
                 response = client.chat.completions.create(
                     model="gpt-4o-mini", 
                     messages=[{"role": "user", "content": prompt}]
                 )
                 
-                # 3) 결과 받아서 화면에 보여주기
                 story = response.choices[0].message.content
                 
                 st.markdown("---")
