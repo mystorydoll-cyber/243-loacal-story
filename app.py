@@ -1,7 +1,8 @@
 import streamlit as st
 import openai
 import pandas as pd
-
+import os
+st.error(f"현재 파일 목록: {os.listdir('.')}")
 # 1. 페이지 기본 설정
 st.set_page_config(page_title="243개 지역: 나만의 이야기 생성기", page_icon="🗺️")
 
