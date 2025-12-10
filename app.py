@@ -2,59 +2,53 @@ import streamlit as st
 import pandas as pd
 import os
 
-# 1. 페이지 설정 (가장 윗부분에 있어야 함)
-st.set_page_config(page_title="243개 지역: 나만의 이야기 생성기", layout="wide")
-st.title("🗺️ 243개 지역: 나만의 이야기 생성기")
+# 1. 페이지 기본 설정
+st.set_page_config(page_title="나만의 이야기 생성기 (테스트)", layout="wide")
+st.title("🧪 나만의 이야기 생성기 (기본 기능 테스트)")
 
-# 2. 사이드바: API 키 입력 받기
+# 2. 사이드바: API 키 입력
 with st.sidebar:
     api_key = st.text_input("OpenAI API Key를 입력하세요", type="password")
     st.markdown("---")
-    st.write("키를 입력해야 이야기가 생성됩니다.")
-
-# 3. API 키가 없으면 경고하고 멈춤
-if not api_key:
-    st.warning("👈 왼쪽 사이드바에 API Key를 먼저 입력해주세요.")
-    st.info("키를 입력하면 화면이 자동으로 새로고침됩니다.")
-    st.stop()  # 여기서 코드 실행 중단
-
-# 4. API 키 설정
-os.environ["OPENAI_API_KEY"] = api_key
-
-# 5. 데이터 로드 (인코딩 문제 해결사)
-@st.cache_data
-def load_data():
-    file_path = 'data.csv'
-    # 1순위: utf-8 (맥/리눅스 표준)
-    try:
-        return pd.read_csv(file_path, encoding='utf-8')
-    except:
-        pass
-    # 2순위: cp949 (윈도우 엑셀 표준)
-    try:
-        return pd.read_csv(file_path, encoding='cp949')
-    except:
-        pass
-    # 3순위: euc-kr (구형 한글)
-    try:
-        return pd.read_csv(file_path, encoding='euc-kr')
-    except:
-        return pd.DataFrame() # 실패하면 빈 데이터 반환
-
-data = load_data()
-
-# 6. 데이터 로드 결과 확인 및 화면 표시
-if data.empty:
-    st.error("❌ 데이터 파일(data.csv)을 읽을 수 없습니다. 파일 내용이나 형식을 확인해주세요.")
-else:
-    st.success("✅ 데이터를 성공적으로 불러왔습니다! 이야기 생성을 시작할 수 있습니다.")
     
-    # 여기서부터 실제 앱 화면 구성
-    st.markdown(f"**총 {len(data)}개의 지역 데이터가 준비되었습니다.**")
-    st.write("당신이 선택한 지역의 캐릭터와 함께 새로운 전설을 만들어보세요!")
-
-    # 사용자 입력 받기
-    user_input = st.text_area("당신의 아이디어를 더해주세요!", placeholder="예: 주인공이 갑자기 초능력을 얻게 된다면?")
+    # [상태 분기 1] 키가 없을 때
+    if not api_key:
+        st.warning("⚠️ 키를 입력해주세요.")
+        st.stop() # 여기서 멈춤
     
-    if st.button("새로운 이야기 만들기 ✨"):
-        st.write("이야기를 만드는 중입니다... (여기에 LLM 연결 코드가 들어갑니다)")
+    # [상태 분기 2] 키가 있을 때
+    st.success("✅ 인증 완료!")
+    os.environ["OPENAI_API_KEY"] = api_key
+
+# 3. 데이터 로드 (파일 안 읽고, 여기서 직접 만듭니다!)
+# 243개 대신 딱 3개만 샘플로 만들어봅니다.
+data = pd.DataFrame({
+    '지역': ['서울 종로', '부산 해운대', '제주도'],
+    '캐릭터': ['김시간 (골동품 가게 주인)', '박파도 (서퍼)', '한라봉 (요정)'],
+    '테마': ['시간여행', '열정과 바다', '신비로운 숲']
+})
+
+# 4. 앱 화면 구성
+st.subheader("1. 지역 데이터 확인")
+st.write("파일 없이 코드에서 직접 만든 데이터입니다.")
+st.dataframe(data) # 표로 보여주기
+
+st.subheader("2. 이야기 설정 선택")
+# 선택 상자 만들기
+selected_region = st.selectbox("어떤 지역의 이야기를 만들까요?", data['지역'])
+
+# 선택한 지역에 맞는 캐릭터 찾기
+character_info = data[data['지역'] == selected_region]['캐릭터'].values[0]
+st.info(f"선택하신 지역의 캐릭터는 **'{character_info}'** 입니다.")
+
+st.subheader("3. 아이디어 입력")
+user_input = st.text_area("어떤 사건이 일어나나요?", placeholder="예: 주인공이 과거로 돌아갔다.")
+
+if st.button("이야기 생성하기 ✨"):
+    if user_input:
+        st.success(f"'{selected_region}'에서 '{character_info}'와 함께하는 이야기를 생성합니다!")
+        st.write(f"입력하신 내용: {user_input}")
+        st.write("---")
+        st.write("🤖 (여기에 실제 AI가 만든 이야기가 들어갈 자리입니다)")
+    else:
+        st.warning("아이디어를 입력해주세요!")
